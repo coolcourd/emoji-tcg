@@ -59,9 +59,19 @@ let state = {};
 
 /* --- AUDIO --- */
 const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+// Volume settings
+let settings = {
+    musicVolume: 0.4,
+    sfxVolume: 0.5
+};
+
 function playSfx(f, t, d) {
+    if (settings.sfxVolume === 0) return; // Skip if muted
     const o = ctx.createOscillator(); const g = ctx.createGain();
-    o.type = t; o.frequency.value = f; g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + d);
+    o.type = t; o.frequency.value = f; 
+    g.gain.setValueAtTime(0.1 * settings.sfxVolume, ctx.currentTime); // Set initial volume
+    g.gain.exponentialRampToValueAtTime(0.01 * settings.sfxVolume, ctx.currentTime + d);
     o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + d);
 }
 
@@ -77,23 +87,91 @@ function stopMusic() {
 }
 
 function playMenuMusic() {
+    if (settings.musicVolume === 0) return; // Skip if muted
     stopMusic();
     currentAudio = new Audio('menu.mp3');
     currentAudio.loop = true;
-    currentAudio.volume = 0.3;
+    currentAudio.volume = settings.musicVolume * 0.75; // Menu music slightly quieter
     currentAudio.play().catch(e => console.log('Audio play failed:', e));
 }
 
 function playBattleMusic() {
+    if (settings.musicVolume === 0) return; // Skip if muted
     stopMusic();
     currentAudio = new Audio('battle.mp3');
     currentAudio.loop = true;
-    currentAudio.volume = 0.4;
+    currentAudio.volume = settings.musicVolume;
     currentAudio.play().catch(e => console.log('Audio play failed:', e));
 }
 
 let currentTutorialPage = 1;
 const totalTutorialPages = 5;
+
+/* --- SETTINGS --- */
+function initSettings() {
+    // Load settings from localStorage
+    const saved = localStorage.getItem('emojiTcgSettings');
+    if (saved) {
+        settings = {...settings, ...JSON.parse(saved)};
+    }
+    
+    // Update UI sliders
+    const musicSlider = document.getElementById('music-volume');
+    const sfxSlider = document.getElementById('sfx-volume');
+    const musicPercent = document.getElementById('music-percent');
+    const sfxPercent = document.getElementById('sfx-percent');
+    
+    if (musicSlider) {
+        musicSlider.value = settings.musicVolume * 100;
+        musicPercent.textContent = Math.round(settings.musicVolume * 100) + '%';
+    }
+    
+    if (sfxSlider) {
+        sfxSlider.value = settings.sfxVolume * 100;
+        sfxPercent.textContent = Math.round(settings.sfxVolume * 100) + '%';
+    }
+    
+    // Add event listeners
+    if (musicSlider) {
+        musicSlider.oninput = function() {
+            settings.musicVolume = this.value / 100;
+            musicPercent.textContent = this.value + '%';
+            if (currentAudio) currentAudio.volume = settings.musicVolume;
+            saveSettings();
+        };
+    }
+    
+    if (sfxSlider) {
+        sfxSlider.oninput = function() {
+            settings.sfxVolume = this.value / 100;
+            sfxPercent.textContent = this.value + '%';
+            saveSettings();
+        };
+    }
+}
+
+function saveSettings() {
+    localStorage.setItem('emojiTcgSettings', JSON.stringify(settings));
+}
+
+function testSfx() {
+    playSfx(440, 'sine', 0.3);
+    setTimeout(() => playSfx(550, 'sine', 0.2), 150);
+}
+
+function toggleMusic() {
+    if (currentAudio && !currentAudio.paused) {
+        stopMusic();
+    } else {
+        // Restart current music based on screen
+        const currentScreen = document.querySelector('.screen:not(.hidden)');
+        if (currentScreen && currentScreen.id === 'battle') {
+            playBattleMusic();
+        } else {
+            playMenuMusic();
+        }
+    }
+}
 
 function tutorialNav(direction) {
     currentTutorialPage += direction;
@@ -435,7 +513,7 @@ function executeAtk(atk, def, defNum) {
     
     // Check for status effect
     let statusApplied = false;
-    if(atk.effect && Math.random() > 0.6) {
+    if(atk.effect && Math.random() > 0.75) {
         def.status = atk.effect;
         statusApplied = true;
         
@@ -801,10 +879,21 @@ function showScreen(id) {
     } else if(id === 'tutorial') {
         currentTutorialPage = 1;
         tutorialNav(0); // Reset to first page
+    } else if(id === 'settings') {
+        initSettings(); // Initialize settings when entering settings screen
     }
 }
 
 initBuilder();
+
+// Initialize settings on page load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        initSettings();
+    });
+} else {
+    initSettings();
+}
 
 // Initialize particle system immediately
 function startParticleSystem() {

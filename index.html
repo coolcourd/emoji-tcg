@@ -9,6 +9,9 @@
 <body>
 
 <div id="menu" class="screen">
+    <div style="position: absolute; top: 20px; left: 20px;">
+        <button onclick="showScreen('settings')" style="background: #444; padding: 8px 12px; font-size: 0.9rem;">⚙️ SETTINGS</button>
+    </div>
     <h1 style="font-size: 3.5rem; color: var(--accent); margin-bottom: 0;">EMOJI TCG</h1>
     <p style="color: #666; margin-bottom: 40px;">Tactical Pocket Edition</p>
     <button onclick="showScreen('tutorial')">TUTORIAL</button>
@@ -86,6 +89,45 @@
         <button onclick="showScreen('menu')" style="background: #444; margin-left: auto;">BACK TO MENU</button>
     </div>
 </div>
+
+<div id="settings" class="screen hidden">
+    <h2 style="color: var(--accent);">⚙️ SETTINGS</h2>
+    <div style="max-width: 500px; text-align: left; padding: 30px; background: #111; border-radius: 15px; margin: 0 auto;">
+        <div style="margin-bottom: 30px;">
+            <h3 style="color: var(--energy); margin-bottom: 15px;">🔊 AUDIO SETTINGS</h3>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; color: #fff;">Background Music Volume:</label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="color: #666; font-size: 0.9rem;">🔇</span>
+                    <input type="range" id="music-volume" min="0" max="100" value="40" style="flex: 1; height: 8px; background: #333; outline: none; border-radius: 5px;">
+                    <span style="color: #666; font-size: 0.9rem;">🔊</span>
+                    <span id="music-percent" style="color: var(--accent); min-width: 35px; text-align: right;">40%</span>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; color: #fff;">Sound Effects Volume:</label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="color: #666; font-size: 0.9rem;">🔇</span>
+                    <input type="range" id="sfx-volume" min="0" max="100" value="50" style="flex: 1; height: 8px; background: #333; outline: none; border-radius: 5px;">
+                    <span style="color: #666; font-size: 0.9rem;">🔊</span>
+                    <span id="sfx-percent" style="color: var(--accent); min-width: 35px; text-align: right;">50%</span>
+                </div>
+            </div>
+            
+            <div style="margin-top: 25px; text-align: center;">
+                <button onclick="testSfx()" style="background: #444; margin-right: 10px;">🔊 TEST SFX</button>
+                <button onclick="toggleMusic()" id="music-toggle">🎵 TOGGLE MUSIC</button>
+            </div>
+        </div>
+    </div>
+    
+    <div style="margin-top: 30px;">
+        <button onclick="showScreen('menu')">BACK TO MENU</button>
+    </div>
+</div>
+
 <div id="deck-builder" class="screen hidden">
     <h2>YOUR DECK (<span id="count">0</span>/10) - Requires at least 1 monster with ⚡1 cost</h2>
     <div id="catalog" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; width: 100%; overflow-y: auto; padding: 20px; background: #000; border-radius: 10px; max-height: 60vh;"></div>
