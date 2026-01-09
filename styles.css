@@ -1,0 +1,295 @@
+:root {
+    --bg: #0d0d12;
+    --card-bg: #1a1a24;
+    --accent: #ff0055;
+    --item: #00d4ff;
+    --energy: #f39c12;
+    --hp: #2ecc71;
+    --text: #ffffff;
+}
+
+body {
+    margin: 0; padding: 0;
+    background: linear-gradient(45deg, #0a0a0a, #1a1a2e, #16213e, #0f0f23, #1a1a2e, #0a0a0a);
+    background-size: 300% 300%;
+    animation: gradientShift 15s ease infinite;
+    color: var(--text);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+    user-select: none;
+    position: relative;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    25% { background-position: 50% 0%; }
+    50% { background-position: 100% 50%; }
+    75% { background-position: 50% 100%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* --- PARTICLE EFFECTS --- */
+.particle-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: -1;
+    overflow: hidden;
+}
+
+.particle {
+    position: absolute;
+    background: rgba(255, 100, 100, 0.1);
+    border-radius: 50%;
+    animation: floatParticle linear infinite;
+}
+
+.particle.ember {
+    background: radial-gradient(circle, rgba(255, 140, 0, 0.3) 0%, rgba(255, 69, 0, 0.1) 50%, transparent 100%);
+    box-shadow: 0 0 10px rgba(255, 100, 0, 0.2);
+}
+
+.particle.smoke {
+    background: radial-gradient(circle, rgba(100, 100, 100, 0.05) 0%, rgba(150, 150, 150, 0.02) 50%, transparent 100%);
+    border-radius: 60%;
+}
+
+.particle.energy {
+    background: radial-gradient(circle, rgba(0, 255, 255, 0.2) 0%, rgba(0, 150, 255, 0.1) 50%, transparent 100%);
+    box-shadow: 0 0 8px rgba(0, 200, 255, 0.1);
+}
+
+@keyframes floatParticle {
+    0% {
+        transform: translateY(100vh) translateX(-20px) rotate(0deg) scale(0.5);
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-20vh) translateX(20px) rotate(360deg) scale(1.2);
+        opacity: 0;
+    }
+}
+
+/* --- SMOKE WISPS --- */
+.smoke-wisp {
+    position: fixed;
+    width: 2px;
+    height: 2px;
+    background: rgba(150, 150, 150, 0.1);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: -1;
+    animation: smokeWisp linear infinite;
+}
+
+@keyframes smokeWisp {
+    0% {
+        transform: translateY(100vh) translateX(0) scale(0.2);
+        opacity: 0;
+        filter: blur(0px);
+    }
+    20% {
+        opacity: 0.6;
+        filter: blur(1px);
+    }
+    80% {
+        opacity: 0.3;
+        filter: blur(3px);
+    }
+    100% {
+        transform: translateY(-10vh) translateX(100px) scale(2);
+        opacity: 0;
+        filter: blur(5px);
+    }
+}
+
+/* --- SCREENS --- */
+.screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg); z-index: 10; }
+.hidden { display: none !important; }
+
+/* --- CONSOLIDATED CARD STYLING --- */
+.card {
+    width: 130px;
+    height: 180px;
+    background: var(--card-bg);
+    border: 2px solid #333;
+    border-radius: 12px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+.card:hover { transform: translateY(-5px); border-color: var(--accent); }
+.card.item-type { border-color: var(--item); }
+.card.mini { width: 115px; height: 145px; padding: 6px; font-size: 0.8rem; }
+.card.active-turn { box-shadow: 0 0 15px var(--accent); border-color: var(--accent); }
+
+.card.in-deck {
+    border-color: var(--energy);
+    border-width: 3px;
+    box-shadow: 0 0 10px rgba(243, 156, 18, 0.4);
+}
+
+.card .emoji { font-size: 40px; text-align: center; margin: 5px 0; }
+.card.mini .emoji { font-size: 28px; margin: 3px 0; }
+.card .name { font-weight: bold; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid #444; margin-bottom: 5px; white-space: nowrap; overflow: hidden; }
+.card .desc { font-size: 9px; color: #bbb; line-height: 1.2; flex-grow: 1; }
+.card .stats { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin-top: 5px; }
+.card .energy-tag { position: absolute; top: -8px; left: -8px; background: var(--energy); color: #000; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 1000; }
+
+/* --- BATTLE BOARD --- */
+#board {
+    width: 100%;
+    max-width: 1000px;
+    height: 100vh;
+    display: grid;
+    grid-template-rows: 1fr 1fr auto;
+    gap: 8px;
+    margin: 0 auto;
+}
+
+.side { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 10px; }
+.bench { display: flex; gap: 6px; background: rgba(255,255,255,0.03); padding: 6px; border-radius: 12px; min-height: 95px; width: 100%; justify-content: center; border: 1px solid #222; }
+.slot { 
+    width: 130px; 
+    height: 180px; 
+    border: 2px dashed #222; 
+    border-radius: 12px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    color: #666; 
+    font-weight: bold; 
+    text-transform: uppercase;
+    position: relative;
+    overflow: hidden; /* Changed from visible to hidden to prevent layout issues */
+}
+
+.slot .card {
+    margin: 0;
+    position: relative;
+    /* Ensure the card fits within the slot */
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.log { color: var(--accent); font-weight: bold; text-align: center; font-size: 1.1rem; text-shadow: 0 0 10px rgba(255,0,85,0.3); position: absolute; top: 38vh; z-index: 100; }
+
+.ui-bar { background: #111; padding: 10px 8px; display: flex; align-items: center; gap: 12px; border-top: 2px solid #222; min-height: 140px; max-height: 160px; }
+.hand { 
+    display: flex; 
+    flex-wrap: wrap;
+    gap: 8px; 
+    flex-grow: 1; 
+    padding: 6px; 
+    max-width: 100%;
+    align-content: flex-start;
+    max-height: 140px;
+    overflow-y: auto;
+}
+
+/* --- STATUS EFFECTS --- */
+.status-burn { box-shadow: 0 0 15px #ff4500 !important; }
+.status-para { box-shadow: 0 0 15px #ffff00 !important; }
+
+/* --- ATTACK ANIMATIONS --- */
+@keyframes attackShake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+@keyframes damageFlash {
+    0% { background-color: rgba(255, 0, 0, 0.8); transform: scale(1); }
+    50% { background-color: rgba(255, 100, 100, 0.6); transform: scale(1.1); }
+    100% { background-color: transparent; transform: scale(1); }
+}
+
+@keyframes statusFlash {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); filter: brightness(1.5); }
+}
+
+.attack-animation { animation: attackShake 0.5s ease-in-out; }
+.damage-animation { animation: damageFlash 0.8s ease-out; }
+.status-animation { animation: statusFlash 0.6s ease-in-out; }
+
+/* --- DAMAGE INDICATOR --- */
+.damage-indicator {
+    position: absolute;
+    font-size: 24px;
+    font-weight: bold;
+    color: #ff4444;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    pointer-events: none;
+    z-index: 1000;
+    animation: damageFloat 1.5s ease-out forwards;
+}
+
+@keyframes damageFloat {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    50% { opacity: 1; transform: translateY(-30px) scale(1.2); }
+    100% { opacity: 0; transform: translateY(-60px) scale(0.8); }
+}
+
+.status-indicator {
+    position: absolute;
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    pointer-events: none;
+    z-index: 1000;
+    animation: statusFloat 1.2s ease-out forwards;
+}
+
+@keyframes statusFloat {
+    0% { opacity: 1; transform: translateY(0) scale(0.8); }
+    50% { opacity: 1; transform: translateY(-20px) scale(1.1); }
+    100% { opacity: 0; transform: translateY(-40px) scale(0.9); }
+}
+
+button { background: var(--accent); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+button:hover { filter: brightness(1.2); }
+button:disabled { background: #333; cursor: not-allowed; }
+
+/* --- TUTORIAL --- */
+.tutorial-page { display: block; }
+.tutorial-page.hidden { display: none; }
+.tutorial-page h3 { margin-top: 20px; margin-bottom: 10px; }
+.tutorial-page p { margin: 8px 0; line-height: 1.5; color: #ccc; }
+
+/* --- MOBILE RESPONSIVENESS --- */
+@media (max-width: 768px) {
+    #board { grid-template-rows: 1fr 1fr auto; gap: 10px; }
+    .ui-bar { padding: 10px 8px; gap: 10px; min-height: 150px; flex-direction: column; align-items: stretch; }
+    .ui-bar > div:first-child { text-align: center; }
+    .hand { gap: 8px; padding: 8px; max-height: 130px; }
+    .card.mini { width: 100px; height: 125px; padding: 5px; font-size: 0.75rem; }
+    .card.mini .emoji { font-size: 24px; }
+    .bench { min-height: 90px; gap: 6px; padding: 6px; }
+    .slot { width: 110px; height: 150px; }
+    button { padding: 8px 16px; font-size: 0.9rem; }
+}
+
+@media (max-width: 480px) {
+    .ui-bar { flex-direction: column; min-height: 130px; }
+    .hand { max-height: 110px; }
+    .card.mini { width: 80px; height: 105px; font-size: 0.7rem; }
+    .card.mini .emoji { font-size: 20px; }
+    .bench { min-height: 80px; gap: 4px; padding: 4px; }
+    .slot { width: 100px; height: 130px; font-size: 0.8rem; }
+    button { padding: 6px 12px; font-size: 0.8rem; }
+}

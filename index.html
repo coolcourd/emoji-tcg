@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emoji TCG: Tactics</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="menu" class="screen">
+    <h1 style="font-size: 3.5rem; color: var(--accent); margin-bottom: 0;">EMOJI TCG</h1>
+    <p style="color: #666; margin-bottom: 40px;">Tactical Pocket Edition</p>
+    <button onclick="showScreen('tutorial')">TUTORIAL</button>
+    <button style="margin-top: 15px;" onclick="showScreen('deck-builder')">DECK BUILDER</button>
+    <button style="margin-top: 15px;" onclick="startGame()">START BATTLE</button>
+</div>
+
+<div id="tutorial" class="screen hidden">
+    <h2 style="color: var(--accent);">TUTORIAL</h2>
+    <div id="tutorial-content" style="max-width: 800px; text-align: left; padding: 20px; background: #111; border-radius: 15px; overflow-y: auto; max-height: 70vh;">
+        <div id="tut-1" class="tutorial-page">
+            <h3 style="color: var(--energy);">🎯 OBJECTIVE</h3>
+            <p>Welcome to <strong>Emoji TCG</strong>! Your goal is to defeat your opponent by knocking out 3 of their monsters.</p>
+            
+            <h3 style="color: var(--energy);">⚡ ENERGY SYSTEM</h3>
+            <p>• You gain <strong>1 Energy</strong> at the start of each turn</p>
+            <p>• Use energy to play monster cards and pay retreat costs</p>
+            <p>• Items cost no energy to play</p>
+        </div>
+        
+        <div id="tut-2" class="tutorial-page hidden">
+            <h3 style="color: var(--energy);">🎴 DECK BUILDING</h3>
+            <p>• Build a deck of exactly <strong>10 cards</strong></p>
+            <p>• Mix monsters and items for strategy</p>
+            <p>• Monster costs: 0-3 energy</p>
+            <p>• Higher cost = stronger monsters</p>
+            
+            <h3 style="color: var(--energy);">🔄 CARD TYPES</h3>
+            <p><strong>🦖 Monsters:</strong> Fight and deal damage</p>
+            <p><strong>🔋 Items:</strong> Provide instant effects</p>
+        </div>
+        
+        <div id="tut-3" class="tutorial-page hidden">
+            <h3 style="color: var(--energy);">⚔️ BATTLE BASICS</h3>
+            <p>• Play 1 monster as your <strong>Active</strong> fighter</p>
+            <p>• Place up to 3 monsters on your <strong>Bench</strong></p>
+            <p>• Only your Active monster can attack</p>
+            <p>• When Active is knocked out, promote from bench</p>
+            
+            <h3 style="color: var(--energy);">🎯 ATTACKING</h3>
+            <p>• Click <strong>ATTACK</strong> to damage opponent's Active</p>
+            <p>• Some attacks cause status effects</p>
+            <p>• Attacking ends your turn</p>
+        </div>
+        
+        <div id="tut-4" class="tutorial-page hidden">
+            <h3 style="color: var(--energy);">💥 STATUS EFFECTS</h3>
+            <p><strong>🔥 Burn:</strong> Take 20 damage each turn</p>
+            <p><strong>⚡ Paralysis:</strong> Cannot attack next turn</p>
+            <p>• Effects clear when retreating</p>
+            
+            <h3 style="color: var(--energy);">🔄 RETREATING</h3>
+            <p>• Click bench monsters to swap with Active</p>
+            <p>• Costs energy equal to monster's retreat cost</p>
+            <p>• Clears status effects</p>
+        </div>
+        
+        <div id="tut-5" class="tutorial-page hidden">
+            <h3 style="color: var(--energy);">📋 STRATEGY TIPS</h3>
+            <p>• <strong>Energy Management:</strong> Save energy for powerful monsters</p>
+            <p>• <strong>Status Control:</strong> Use 💉 Antidote to cure effects</p>
+            <p>• <strong>Healing Items:</strong> Keep monsters healthy</p>
+            <p>• <strong>Bench Planning:</strong> Always have backup monsters</p>
+            
+            <h3 style="color: var(--energy);">🏆 WINNING</h3>
+            <p>First player to score <strong>3 knockouts</strong> wins!</p>
+            <p>Good luck, trainer! 🎮</p>
+        </div>
+    </div>
+    
+    <div style="margin-top: 20px; display: flex; gap: 15px; align-items: center;">
+        <button id="tut-prev" onclick="tutorialNav(-1)" style="background: #444;">◀ PREV</button>
+        <span id="tut-counter" style="color: var(--accent); font-weight: bold;">1 / 5</span>
+        <button id="tut-next" onclick="tutorialNav(1)">NEXT ▶</button>
+        <button onclick="showScreen('menu')" style="background: #444; margin-left: auto;">BACK TO MENU</button>
+    </div>
+</div>
+<div id="deck-builder" class="screen hidden">
+    <h2>YOUR DECK (<span id="count">0</span>/10) - Requires at least 1 monster with ⚡1 cost</h2>
+    <div id="catalog" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; width: 100%; overflow-y: auto; padding: 20px; background: #000; border-radius: 10px; max-height: 60vh;"></div>
+    <div style="margin-top: 20px;">
+        <button onclick="saveDeck()">SAVE & BACK</button>
+        <button style="background: #444" onclick="clearDeck()">RESET</button>
+        <button style="background: #2e7d32; margin-left: 10px;" onclick="generateRandomDeck()">RANDOM DECK</button>
+    </div>
+</div>
+
+<div id="battle" class="screen hidden" style="padding: 0;">
+    <div id="board">
+        <div class="side">
+            <div style="font-size: 0.8rem; color: #fff; margin-bottom: 10px; text-align: center;">
+                🤖 CPU SCORE: <span id="cpu-score">0</span>/3
+            </div>
+            <div id="cpu-bench" class="bench"></div>
+            <div id="cpu-active" class="slot">ACTIVE</div>
+        </div>
+
+        <div id="game-log" class="log">READY? BATTLE!</div>
+
+        <div class="side">
+            <div id="player-active" class="slot">ACTIVE</div>
+            <div id="player-bench" class="bench"></div>
+        </div>
+
+        <div class="ui-bar">
+            <div style="font-size: 0.8rem; line-height: 1.4;">
+                ⚡ ENERGY: <span id="p-nrg" style="color: var(--energy)">0</span><br>
+                🏆 SCORE: <span id="p-scr">0</span>/3
+            </div>
+            <div id="player-hand" class="hand"></div>
+            <div id="attack-buttons">
+                <button id="atk-btn" onclick="handleAttack(1)">ATTACK</button>
+                <button id="atk2-btn" onclick="handleAttack(2)" style="display: none;">POWER ATTACK</button>
+            </div>
+            <button onclick="endTurn()" style="background: #444">END TURN</button>
+            <button onclick="forfeitGame()" style="background: #666; margin-left: auto;">FORFEIT</button>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
