@@ -16,7 +16,8 @@
     <p style="color: #666; margin-bottom: 40px;">Tactical Pocket Edition</p>
     <button onclick="showScreen('tutorial')">TUTORIAL</button>
     <button style="margin-top: 15px;" onclick="showScreen('deck-builder')">DECK BUILDER</button>
-    <button style="margin-top: 15px;" onclick="startGame()">START BATTLE</button>
+    <button style="margin-top: 15px;" onclick="startGame()">VS CPU</button>
+    <button style="margin-top: 15px;" onclick="findOnlineGame()">FIND ONLINE GAME</button>
 </div>
 
 <div id="tutorial" class="screen hidden">
@@ -138,6 +139,15 @@
     </div>
 </div>
 
+<div id="waiting" class="screen hidden">
+    <h2 style="color: var(--accent);">🔍 FINDING OPPONENT...</h2>
+    <div style="text-align: center; padding: 50px;">
+        <div style="font-size: 4rem; margin: 30px 0;">⏳</div>
+        <p style="color: #aaa; font-size: 1.2rem;">Searching for another player...</p>
+        <button onclick="cancelSearch()" style="margin-top: 30px; background: #666;">CANCEL</button>
+    </div>
+</div>
+
 <div id="battle" class="screen hidden" style="padding: 0;">
     <div id="board">
         <div class="side">
@@ -171,6 +181,7 @@
     </div>
 </div>
 
+<script src="/socket.io/socket.io.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

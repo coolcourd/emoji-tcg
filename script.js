@@ -107,6 +107,86 @@ function playBattleMusic() {
 let currentTutorialPage = 1;
 const totalTutorialPages = 5;
 
+/* --- MULTIPLAYER --- */
+let socket = null;
+let isMultiplayer = false;
+let playerIndex = -1; // 0 for player 1, 1 for player 2
+let roomId = null;
+
+function initSocket() {
+    if (!socket) {
+        socket = io();
+        
+        socket.on('waitingForOpponent', () => {
+            showScreen('waiting');
+        });
+        
+        socket.on('gameStart', (data) => {
+            isMultiplayer = true;
+            playerIndex = data.playerIndex;
+            roomId = data.roomId;
+            
+            // Use the decks from the server
+            const myDeck = data.playerDeck;
+            const opponentDeck = data.opponentDeck;
+            
+            startMultiplayerGame(myDeck, opponentDeck);
+        });
+        
+        socket.on('opponentAction', (data) => {
+            handleOpponentAction(data);
+        });
+        
+        socket.on('turnChange', (currentPlayerIndex) => {
+            // Update client's turn state to match server
+            state.turn = currentPlayerIndex + 1; // Server uses 0/1, client uses 1/2
+            
+            // Update UI to show whose turn it is
+            const isMyTurn = currentPlayerIndex === playerIndex;
+            updateTurnIndicator(isMyTurn);
+        });
+        
+        socket.on('opponentDisconnected', () => {
+            alert('Opponent disconnected! Returning to menu.');
+            showScreen('menu');
+            resetMultiplayer();
+        });
+        
+        socket.on('error', (data) => {
+            console.log('Server error:', data.message);
+            log(`Server: ${data.message}`);
+        });
+    }
+}
+
+function findOnlineGame() {
+    if(playerDeck.length < 10) return alert("Select 10 cards!");
+    
+    const deckCards = playerDeck.map(id => CARDS.find(c => c.id === id));
+    const lowCostMonsters = deckCards.filter(c => c.type === 'mon' && c.cost <= 1);
+    if(lowCostMonsters.length === 0) {
+        return alert("Your deck must contain at least 1 monster with ⚡0 or ⚡1 energy cost!");
+    }
+    
+    initSocket();
+    socket.emit('findGame', playerDeck);
+}
+
+function cancelSearch() {
+    if (socket) {
+        socket.disconnect();
+        socket = null;
+    }
+    resetMultiplayer();
+    showScreen('menu');
+}
+
+function resetMultiplayer() {
+    isMultiplayer = false;
+    playerIndex = -1;
+    roomId = null;
+}
+
 /* --- SETTINGS --- */
 function initSettings() {
     // Load settings from localStorage
@@ -270,6 +350,12 @@ function startGame() {
         return alert("Your deck must contain at least 1 monster with ⚡0 or ⚡1 energy cost!");
     }
     
+    // Start CPU game
+    isMultiplayer = false;
+    startCpuGame();
+}
+
+function startCpuGame() {
     showScreen('battle');
     playBattleMusic();
     state = {
@@ -289,6 +375,36 @@ function startGame() {
     // Start the first turn properly
     updateUI();
     log("Your turn! Play monsters and items, then attack or end turn.");
+}
+
+function startMultiplayerGame(myDeck, opponentDeck) {
+    showScreen('battle');
+    playBattleMusic();
+    
+    // Initialize game state for multiplayer - both players use their own deck as p1
+    state = {
+        turn: 1, // Always start with turn 1, server manages actual turn order
+        p1: { energy: 1, score: 0, hand: [], active: null, bench: [], deck: shuffle([...myDeck]), freeRetreat: false },
+        p2: { energy: 1, score: 0, hand: [], active: null, bench: [], deck: [], freeRetreat: false }, // Opponent state managed by server
+        over: false
+    };
+    
+    // Set up starting hand for local player
+    guaranteeLowCostMonster(1);
+    for(let i=0; i<2; i++) { draw(1); }
+    
+    updateUI();
+    
+    if (playerIndex === 0) {
+        log("Game started! Your turn first.");
+    } else {
+        log("Game started! Waiting for opponent...");
+    }
+    
+    // Request initial turn state from server
+    if (socket) {
+        socket.emit('requestTurnState');
+    }
 }
 
 function guaranteeLowCostMonster(pNum) {
@@ -387,7 +503,18 @@ function renderPlayerHand() {
 }
 
 function playCard(idx) {
-    if(state.turn !== 1) return;
+    // Check if it's the player's turn
+    if (isMultiplayer) {
+        // In multiplayer, check if it's our turn based on our player index
+        if (state.turn !== (playerIndex + 1)) {
+            log("It's not your turn!");
+            return;
+        }
+    } else {
+        // In single player, only player 1 can play
+        if (state.turn !== 1) return;
+    }
+    
     const p = state.p1;
     const card = p.hand[idx];
 
@@ -396,6 +523,17 @@ function playCard(idx) {
         p.hand.splice(idx, 1);
         playSfx(800, 'triangle', 0.2);
         log(`Used ${card.name}!`);
+        
+        // Send multiplayer action for item use
+        if (isMultiplayer && socket) {
+            socket.emit('gameAction', {
+                type: 'playCard',
+                cardType: 'item',
+                cardId: card.id,
+                cardName: card.name
+            });
+        }
+        
         updateUI();
     } else {
         if(!p.active) {
@@ -404,6 +542,18 @@ function playCard(idx) {
                 p.active = p.hand.splice(idx, 1)[0];
                 playSfx(400, 'square', 0.2);
                 log(`${card.name} enters battle!`);
+                
+                // Send multiplayer action for monster play
+                if (isMultiplayer && socket) {
+                    socket.emit('gameAction', {
+                        type: 'playCard',
+                        cardType: 'mon',
+                        cardId: card.id,
+                        position: 'active',
+                        cardData: p.active
+                    });
+                }
+                
                 updateUI(); // Move updateUI after all state changes
             } else {
                 log("Not enough energy!");
@@ -414,6 +564,18 @@ function playCard(idx) {
                 p.bench.push(p.hand.splice(idx, 1)[0]);
                 playSfx(300, 'square', 0.2);
                 log(`${card.name} waits on bench!`);
+                
+                // Send multiplayer action for bench play
+                if (isMultiplayer && socket) {
+                    socket.emit('gameAction', {
+                        type: 'playCard',
+                        cardType: 'mon',
+                        cardId: card.id,
+                        position: 'bench',
+                        cardData: p.bench[p.bench.length - 1]
+                    });
+                }
+                
                 updateUI(); // Move updateUI after all state changes
             } else {
                 log("Not enough energy!");
@@ -425,7 +587,9 @@ function playCard(idx) {
 }
 
 function retreat(benchIdx) {
-    if(state.turn !== 1 || !state.p1.active || state.p1.bench.length === 0) {
+    // Check if it's the player's turn
+    const isMyTurn = isMultiplayer ? state.turn === (playerIndex + 1) : state.turn === 1;
+    if(!isMyTurn || !state.p1.active || state.p1.bench.length === 0) {
         log("Cannot retreat right now!");
         return;
     }
@@ -454,7 +618,9 @@ function retreat(benchIdx) {
 }
 
 function handleAttack(attackNum = 1) {
-    if(state.turn !== 1 || !state.p1.active || !state.p2.active) return;
+    // Check if it's the player's turn
+    const isMyTurn = isMultiplayer ? state.turn === (playerIndex + 1) : state.turn === 1;
+    if(!isMyTurn || !state.p1.active || !state.p2.active) return;
     if(state.p1.active.status === 'para') return log("Paralyzed! Cannot attack.");
     
     const attacker = state.p1.active;
@@ -480,6 +646,16 @@ function handleAttack(attackNum = 1) {
     
     // Deduct energy cost
     state.p1.energy -= energyCost;
+    
+    // Send attack action to opponent in multiplayer
+    if (isMultiplayer && socket) {
+        socket.emit('gameAction', {
+            type: 'attack',
+            damage: damage,
+            attackName: attackName,
+            effect: effect
+        });
+    }
     
     executeAtk({...attacker, dmg: damage, atk: attackName, effect: effect}, state.p2.active, 2);
     endTurn();
@@ -566,23 +742,56 @@ function executeAtk(atk, def, defNum) {
 }
 
 function startTurn() {
-    const p = state[`p${state.turn}`];
-    p.energy++;
-    draw(state.turn);
-    if(p.active && p.active.status === 'burn') {
-        p.active.hp -= 20;
-        log("🔥 Burn damage: 20 HP lost!");
-        
-        // Show burn damage indicator
-        const targetSlot = state.turn === 1 ? 
-            document.getElementById('player-active') : 
-            document.getElementById('cpu-active');
-        showDamageIndicator(targetSlot, 20, "#ff4500");
-        targetSlot.classList.add('damage-animation');
-        setTimeout(() => targetSlot.classList.remove('damage-animation'), 800);
+    // In multiplayer, only give energy to local player on their turn
+    if (isMultiplayer) {
+        if (state.turn === (playerIndex + 1)) {
+            state.p1.energy++; // Only local player gets energy
+            draw(1); // Only local player draws
+            
+            // Handle burn damage for local player
+            if(state.p1.active && state.p1.active.status === 'burn') {
+                state.p1.active.hp -= 20;
+                log("🔥 Burn damage: 20 HP lost!");
+                const targetSlot = document.getElementById('player-active');
+                showDamageIndicator(targetSlot, 20, "#ff4500");
+                targetSlot.classList.add('damage-animation');
+                setTimeout(() => targetSlot.classList.remove('damage-animation'), 800);
+            }
+        }
+        // Send energy gain to opponent
+        if (socket && state.turn === (playerIndex + 1)) {
+            socket.emit('gameAction', {
+                type: 'startTurn',
+                energy: state.p1.energy
+            });
+        }
+    } else {
+        // Single player mode - original logic
+        const p = state[`p${state.turn}`];
+        p.energy++;
+        draw(state.turn);
+        if(p.active && p.active.status === 'burn') {
+            p.active.hp -= 20;
+            log("🔥 Burn damage: 20 HP lost!");
+            
+            const targetSlot = state.turn === 1 ? 
+                document.getElementById('player-active') : 
+                document.getElementById('cpu-active');
+            showDamageIndicator(targetSlot, 20, "#ff4500");
+            targetSlot.classList.add('damage-animation');
+            setTimeout(() => targetSlot.classList.remove('damage-animation'), 800);
+        }
     }
     updateUI();
-    if(state.turn === 2) setTimeout(cpuLogic, 1000);
+    
+    // Update turn indicator for multiplayer
+    if (isMultiplayer) {
+        const isMyTurn = state.turn === (playerIndex + 1);
+        updateTurnIndicator(isMyTurn);
+    }
+    
+    // Only run CPU logic in single player mode
+    if(state.turn === 2 && !isMultiplayer) setTimeout(cpuLogic, 1000);
 }
 
 function endTurn() {
@@ -602,8 +811,131 @@ function endTurn() {
         return;
     }
     
-    state.turn = state.turn === 1 ? 2 : 1;
-    startTurn();
+    // Send multiplayer action
+    if (isMultiplayer && socket) {
+        socket.emit('gameAction', { type: 'endTurn' });
+    }
+    
+    // For single player or after sending multiplayer action
+    if (!isMultiplayer) {
+        state.turn = state.turn === 1 ? 2 : 1;
+        startTurn();
+    } else {
+        // In multiplayer, turn switching is handled by the server
+        log("Turn ended. Waiting for opponent...");
+    }
+}
+
+function handleOpponentAction(data) {
+    switch(data.type) {
+        case 'playCard':
+            // Handle opponent playing a card
+            if (data.cardType === 'mon') {
+                // Add monster to opponent's field
+                const cardData = data.cardData || CARDS.find(c => c.id === data.cardId);
+                if (cardData) {
+                    // Create proper monster copy
+                    const monsterCopy = { 
+                        ...cardData, 
+                        status: null, 
+                        maxHp: cardData.hp 
+                    };
+                    
+                    if (data.position === 'active') {
+                        state.p2.active = monsterCopy;
+                        log(`Opponent played ${cardData.name} as active!`);
+                    } else {
+                        state.p2.bench.push(monsterCopy);
+                        log(`Opponent played ${cardData.name} on bench!`);
+                    }
+                }
+            } else if (data.cardType === 'item') {
+                log(`Opponent used ${data.cardName}!`);
+                // Note: item effects on opponent are handled by their own game state
+            }
+            break;
+            
+        case 'attack':
+            // Handle opponent attack
+            if (data.damage && state.p1.active) {
+                state.p1.active.hp -= data.damage;
+                log(`Opponent attacked for ${data.damage} damage!`);
+                
+                if (data.effect && Math.random() > 0.75) {
+                    state.p1.active.status = data.effect;
+                    log(`Your monster is ${data.effect === 'burn' ? 'burned' : 'paralyzed'}!`);
+                }
+                
+                if (state.p1.active.hp <= 0) {
+                    state.p2.score++;
+                    state.p1.active = null;
+                    log("💥 Your monster was knocked out!");
+                    
+                    // Auto-replace from bench
+                    if(state.p1.bench.length > 0) {
+                        state.p1.active = state.p1.bench.shift();
+                    }
+                }
+            }
+            break;
+            
+        case 'endTurn':
+            // Switch turns
+            state.turn = state.turn === 1 ? 2 : 1;
+            startTurn();
+            break;
+            
+        case 'retreat':
+            // Handle opponent retreat
+            if (data.from !== undefined && data.to !== undefined) {
+                // Swap opponent's active and bench monster
+                const temp = state.p2.active;
+                state.p2.active = state.p2.bench[data.to];
+                state.p2.bench[data.to] = temp;
+                log("Opponent retreated their monster!");
+            }
+            break;
+            
+        case 'startTurn':
+            // Handle opponent starting their turn (energy gain)
+            if (data.energy) {
+                log(`Opponent gained energy (now has ${data.energy})`);
+            }
+            break;
+            
+        case 'gameOver':
+            // Handle game over from opponent
+            if (data.reason === 'noMonsters') {
+                alert("Opponent has no monsters left!");
+                alert("VICTORY!");
+                stopMusic();
+                showScreen('menu');
+                resetMultiplayer();
+            }
+            break;
+    }
+    
+    updateUI();
+    checkWin();
+}
+
+function updateTurnIndicator(isMyTurn) {
+    const indicator = document.getElementById('turn-indicator');
+    if (!indicator) {
+        // Create turn indicator if it doesn't exist
+        const turnDiv = document.createElement('div');
+        turnDiv.id = 'turn-indicator';
+        turnDiv.style.cssText = 'position: fixed; top: 10px; right: 10px; background: var(--accent); color: white; padding: 10px 15px; border-radius: 10px; font-weight: bold; z-index: 1000;';
+        document.body.appendChild(turnDiv);
+    }
+    
+    const turnIndicator = document.getElementById('turn-indicator');
+    if (isMultiplayer) {
+        turnIndicator.textContent = isMyTurn ? "YOUR TURN" : "OPPONENT'S TURN";
+        turnIndicator.style.display = 'block';
+    } else {
+        turnIndicator.style.display = 'none';
+    }
 }
 
 function cpuLogic() {
@@ -773,29 +1105,68 @@ function renderSlot(id, card) {
 function checkWin() {
     if(state.p1.score >= 3 || state.p2.score >= 3) {
         state.over = true;
-        alert(state.p1.score >= 3 ? "VICTORY!" : "DEFEAT!");
-        stopMusic();
-        location.reload();
+        
+        // Handle different game modes
+        if (isMultiplayer) {
+            // In multiplayer, player 1 is always the local player
+            if (state.p1.score >= 3) {
+                alert("VICTORY! You won!");
+            } else {
+                alert("DEFEAT! Opponent won!");
+            }
+            
+            // Notify server and return to menu
+            if (socket) {
+                socket.emit('gameAction', { type: 'gameOver', reason: 'knockout', winner: state.p1.score >= 3 ? 1 : 2 });
+            }
+            stopMusic();
+            showScreen('menu');
+            resetMultiplayer();
+        } else {
+            // Single player mode
+            alert(state.p1.score >= 3 ? "VICTORY!" : "DEFEAT!");
+            stopMusic();
+            location.reload();
+        }
     }
 }
 
 function checkNoMonstersLoss() {
-    // Check if current player has no monsters in play
-    const currentPlayer = state[`p${state.turn}`];
-    const hasActiveMonster = currentPlayer.active && currentPlayer.active.type === 'mon';
-    const hasBenchMonsters = currentPlayer.bench.some(card => card.type === 'mon');
-    
-    if (!hasActiveMonster && !hasBenchMonsters) {
-        state.over = true;
-        const playerName = state.turn === 1 ? "Player" : "CPU";
-        alert(`${playerName} loses - no monsters in play!`);
-        if (state.turn === 1) {
+    // In multiplayer, only check local player's state
+    if (isMultiplayer) {
+        // Check if local player has no monsters
+        const hasActiveMonster = state.p1.active && state.p1.active.type === 'mon';
+        const hasBenchMonsters = state.p1.bench.some(card => card.type === 'mon');
+        
+        if (!hasActiveMonster && !hasBenchMonsters) {
+            state.over = true;
+            alert("You lose - no monsters in play!");
             alert("DEFEAT!");
-        } else {
-            alert("VICTORY!");
+            
+            if (socket) {
+                socket.emit('gameAction', { type: 'gameOver', reason: 'noMonsters', winner: 'opponent' });
+            }
+            stopMusic();
+            showScreen('menu');
+            resetMultiplayer();
         }
-        stopMusic();
-        location.reload();
+    } else {
+        // Single player mode - check current turn player
+        const currentPlayer = state[`p${state.turn}`];
+        const hasActiveMonster = currentPlayer.active && currentPlayer.active.type === 'mon';
+        const hasBenchMonsters = currentPlayer.bench.some(card => card.type === 'mon');
+        
+        if (!hasActiveMonster && !hasBenchMonsters) {
+            state.over = true;
+            const playerName = state.turn === 1 ? "Player" : "CPU";
+            const winMessage = state.turn === 1 ? "DEFEAT!" : "VICTORY!";
+            const loseMessage = `${playerName} loses - no monsters in play!`;
+            
+            alert(loseMessage);
+            alert(winMessage);
+            stopMusic();
+            location.reload();
+        }
     }
 }
 

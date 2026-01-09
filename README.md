@@ -1,8 +1,49 @@
-# 🎮 Emoji TCG: Tactics
+# 🎮 Emoji TCG: Tactics - Online Multiplayer
 
-A tactical trading card game played entirely with emojis! Build your deck, deploy your monsters, and battle your way to victory in this fast-paced browser-based TCG.
+A tactical trading card game played entirely with emojis! Build your deck, deploy your monsters, and battle your way to victory in this fast-paced browser-based TCG. Now featuring **online multiplayer**!
 
-![Game Preview](https://img.shields.io/badge/Game-Emoji%20TCG-ff0055?style=for-the-badge&logo=gamepad)
+## 🚀 Quick Start
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Start the server:**
+   ```bash
+   npm start
+   ```
+
+3. **Open the game:**
+   Open your browser and go to `http://localhost:3000`
+
+4. **Play online:**
+   - Build your deck (requires at least 1 monster with 0 or 1 energy cost)
+   - Click "FIND ONLINE GAME" to search for an opponent
+   - When matched, you'll be put into a game together!
+
+## 🎯 Game Modes
+
+- **VS CPU**: Play against the computer (original single-player mode)
+- **Online Multiplayer**: Find and play against real players in real-time
+- **Automatic matchmaking**: Get paired with waiting players instantly
+
+## 🔧 How Multiplayer Works
+
+The game uses Socket.io for real-time communication between players:
+
+1. Click "Find Online Game" to join the matchmaking queue
+2. When another player joins, you're both matched together  
+3. The game starts with both players' decks
+4. All actions (playing cards, attacking, ending turn) are synced in real-time
+5. If someone disconnects, the other player is notified
+
+## 🛠️ Development
+
+For development with auto-restart:
+```bash
+npm run dev
+```
 ![Status](https://img.shields.io/badge/Status-Playable-2ecc71?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-Web%20Browser-00d4ff?style=for-the-badge)
 
