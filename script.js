@@ -50,7 +50,7 @@ const CARDS = [
     { id: 34, type: 'item', name: "Shield Wall", emoji: "🛡️", desc: "Reduce all damage taken by 20 this turn.", func: (p) => p.shield = 20 },
     { id: 35, type: 'item', name: "Antidote", emoji: "💉", desc: "Removes all status effects from Active.", func: (p) => { if(p.active) p.active.status = null } },
     { id: 36, type: 'item', name: "Lucky Coin", emoji: "🪙", desc: "Draw 2 extra cards immediately.", func: (p) => p.extraDraw = 2 },
-    { id: 37, type: 'item', name: "Time Warp", emoji: "⏰", desc: "Take another turn after this one.", func: (p) => p.extraTurn = true },
+    { id: 37, type: 'item', name: "Time Warp", emoji: "⏰", desc: "Heal all your monsters in play for 15 HP.", func: (p) => { if(p.active) p.active.hp += 15; p.bench.forEach(m => m.hp += 15); } },
     { id: 38, type: 'item', name: "Recall Device", emoji: "📱", desc: "Return a monster from bench to hand.", func: (p) => p.canRecall = true }
 ];
 
@@ -238,13 +238,13 @@ function generateRandomDeck() {
     // Clear current deck
     playerDeck = [];
     
-    // Get all 1-energy monsters to ensure at least one is included
-    const oneEnergyMonsters = CARDS.filter(c => c.type === 'mon' && c.cost === 1);
-    const otherCards = CARDS.filter(c => !(c.type === 'mon' && c.cost === 1));
+    // Get all 0-1 energy monsters to ensure at least one is included
+    const lowCostMonsters = CARDS.filter(c => c.type === 'mon' && c.cost <= 1);
+    const otherCards = CARDS.filter(c => !(c.type === 'mon' && c.cost <= 1));
     
-    // Add at least one 1-energy monster
-    const randomOneEnergy = oneEnergyMonsters[Math.floor(Math.random() * oneEnergyMonsters.length)];
-    playerDeck.push(randomOneEnergy.id);
+    // Add at least one 0-1 energy monster
+    const randomLowCost = lowCostMonsters[Math.floor(Math.random() * lowCostMonsters.length)];
+    playerDeck.push(randomLowCost.id);
     
     // Fill the remaining 9 slots with random cards from all available cards
     const allCards = [...CARDS];
@@ -263,11 +263,11 @@ function saveDeck() { localStorage.setItem('v2_deck', JSON.stringify(playerDeck)
 function startGame() {
     if(playerDeck.length < 10) return alert("Select 10 cards!");
     
-    // Check for at least one 1-energy monster requirement
+    // Check for at least one 0-1 energy monster requirement
     const deckCards = playerDeck.map(id => CARDS.find(c => c.id === id));
-    const oneEnergyMonsters = deckCards.filter(c => c.type === 'mon' && c.cost === 1);
-    if(oneEnergyMonsters.length === 0) {
-        return alert("Your deck must contain at least 1 monster with ⚡1 energy cost!");
+    const lowCostMonsters = deckCards.filter(c => c.type === 'mon' && c.cost <= 1);
+    if(lowCostMonsters.length === 0) {
+        return alert("Your deck must contain at least 1 monster with ⚡0 or ⚡1 energy cost!");
     }
     
     showScreen('battle');
@@ -279,9 +279,9 @@ function startGame() {
         over: false
     };
     
-    // Guarantee starting hand has at least one 1-energy monster
-    guaranteeOneEnergyMonster(1);
-    guaranteeOneEnergyMonster(2);
+    // Guarantee starting hand has at least one 0-1 energy monster
+    guaranteeLowCostMonster(1);
+    guaranteeLowCostMonster(2);
     
     // Draw remaining cards normally
     for(let i=0; i<2; i++) { draw(1); draw(2); }
@@ -291,21 +291,21 @@ function startGame() {
     log("Your turn! Play monsters and items, then attack or end turn.");
 }
 
-function guaranteeOneEnergyMonster(pNum) {
+function guaranteeLowCostMonster(pNum) {
     const p = state[`p${pNum}`];
     
-    // Find all 1-energy monsters in deck
-    const oneEnergyIndices = [];
+    // Find all 0-1 energy monsters in deck
+    const lowCostIndices = [];
     for(let i = 0; i < p.deck.length; i++) {
         const cardData = CARDS.find(c => c.id === p.deck[i]);
-        if(cardData && cardData.type === 'mon' && cardData.cost === 1) {
-            oneEnergyIndices.push(i);
+        if(cardData && cardData.type === 'mon' && cardData.cost <= 1) {
+            lowCostIndices.push(i);
         }
     }
     
-    if(oneEnergyIndices.length > 0) {
-        // Pick a random 1-energy monster and move it to hand
-        const randomIndex = oneEnergyIndices[Math.floor(Math.random() * oneEnergyIndices.length)];
+    if(lowCostIndices.length > 0) {
+        // Pick a random 0-1 energy monster and move it to hand
+        const randomIndex = lowCostIndices[Math.floor(Math.random() * lowCostIndices.length)];
         const cardId = p.deck[randomIndex];
         const cardData = CARDS.find(c => c.id === cardId);
         // Create a proper copy of the card with all properties, preserving functions
@@ -315,7 +315,7 @@ function guaranteeOneEnergyMonster(pNum) {
         p.hand.push(cardCopy);
         p.deck.splice(randomIndex, 1);
     } else {
-        // Fallback: draw normally if no 1-energy monsters (shouldn't happen after validation)
+        // Fallback: draw normally if no 0-1 energy monsters (shouldn't happen after validation)
         draw(pNum);
     }
     
@@ -501,7 +501,16 @@ function executeAtk(atk, def, defNum) {
     setTimeout(() => attackerSlot.classList.remove('attack-animation'), 500);
     
     // Apply damage
-    const damage = atk.dmg;
+    let damage = atk.dmg;
+    
+    // Check for Power Glove double damage effect
+    const attackingPlayer = state[`p${state.turn}`];
+    if(attackingPlayer.doubleDamage) {
+        damage *= 2;
+        attackingPlayer.doubleDamage = false; // Use up the effect
+        log("🥊 POWER GLOVE! Double damage!");
+    }
+    
     def.hp -= damage;
     
     // Show damage indicator
@@ -582,6 +591,16 @@ function endTurn() {
     // Check for losing condition - no monsters in play
     checkNoMonstersLoss();
     if(state.over) return;
+    
+    // Check for extra turn from Time Warp
+    const currentPlayer = state[`p${state.turn}`];
+    if(currentPlayer.extraTurn) {
+        currentPlayer.extraTurn = false; // Reset the flag
+        log("⏰ TIME WARP! Taking another turn!");
+        playSfx(800, 'sine', 0.3);
+        startTurn(); // Start another turn for the same player
+        return;
+    }
     
     state.turn = state.turn === 1 ? 2 : 1;
     startTurn();
